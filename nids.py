@@ -1,15 +1,19 @@
+#!/opt/conda/envs/nids/bin/python
+
 # Main script to combine packet capture and traffic analysis
 
 import time
-from packet_capture import PacketCapture  # Import PacketCapture from packet-capture.py
-from traffic_analysis import TrafficAnalysis  # Import TrafficAnalysis from traffic-analysis.py
+from packet_capture import PacketCapture  # Import PacketCapture from packet_capture.py
+from traffic_analysis import TrafficAnalysis  # Import TrafficAnalysis from traffic_analysis.py
+from detection_engine import DetectionEngine  # Import DetectionEngine from detection_engine.py
 from scapy.all import IP, TCP
 
 
 def main():
-    # Initialize PacketCapture and TrafficAnalysis
+    # Initialize PacketCapture, TrafficAnalysis, and DetectionEngine
     capture = PacketCapture()  # Default interface
     analyzer = TrafficAnalysis()
+    detector = DetectionEngine()
 
     # Start packet capture
     capture.start_capture()
@@ -31,6 +35,11 @@ def main():
                 features = analyzer.analyze_packet(packet)
                 if features:
                     print("Extracted Features:", features)
+
+                    # Detect threats
+                    threats = detector.detect_threats(features)
+                    if threats:
+                        print("Threats Detected:", threats)
             else:
                 # No packet captured in the last second
                 pass  # You can add a sleep or other logic here if needed

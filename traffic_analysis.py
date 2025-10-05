@@ -1,3 +1,5 @@
+#!/opt/conda/envs/nids/bin/python
+
 # NIDS - Network Intrusion Detection System
 
 # Traffic analysis module
