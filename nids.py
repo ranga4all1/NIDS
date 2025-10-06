@@ -6,6 +6,7 @@ import time
 from packet_capture import PacketCapture
 from traffic_analysis import TrafficAnalysis
 from detection_engine import DetectionEngine
+from alert_system import AlertSystem
 from scapy.all import IP, TCP
 
 
@@ -14,6 +15,7 @@ def main():
     capture = PacketCapture()
     analyzer = TrafficAnalysis()
     detector = DetectionEngine()
+    alerter = AlertSystem()
 
     # Start packet capture
     capture.start_capture()
@@ -74,8 +76,10 @@ def main():
                             for threat in threats:
                                 if threat['type'] == 'signature':
                                     print(f"  [SIGNATURE] Rule: {threat['rule']}, Confidence: {threat['confidence']}")
+                                    alerter.send_alert(f"Signature Threat Detected: Rule={threat['rule']}, Confidence={threat['confidence']}")  # Send alert
                                 elif threat['type'] == 'anomaly':
                                     print(f"  [ANOMALY] Score: {threat['score']:.3f}, Confidence: {threat['confidence']:.3f}")
+                                    alerter.send_alert(f"Anomaly Threat Detected: Score={threat['score']:.3f}, Confidence={threat['confidence']:.3f}")  # Send alert
                             print("=" * 60)
                         else:
                             print("✓ No threats detected")
