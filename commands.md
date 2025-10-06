@@ -12,10 +12,12 @@ pip install -r requirements.txt
 
 ## start NIDS
 ```
-sudo python nids.py
+# sudo python nids.py
+sudo /opt/conda/envs/nids/bin/python nids.py
 ```
 
 ## start traffic generator
 ```
-sudo python generate_suspicious_traffic.py
+# sudo python generate_suspicious_traffic.py
+sudo /opt/conda/envs/nids/bin/python generate_suspicious_traffic.py
 ```
