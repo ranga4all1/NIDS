@@ -11,13 +11,16 @@ pip install -r requirements.txt
 ```
 
 ## start NIDS
+'''
+Note: Make sure to use python from your virtual environment
+'''
 ```
-# sudo python nids.py
+conda activate nids
 sudo /opt/conda/envs/nids/bin/python nids.py
 ```
 
-## start traffic generator
+- In another terminal start traffic generator
 ```
-# sudo python generate_suspicious_traffic.py
+conda activate nids
 sudo /opt/conda/envs/nids/bin/python generate_suspicious_traffic.py
 ```

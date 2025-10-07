@@ -19,8 +19,8 @@ class AlertSystem:
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
 
-    def send_alert(self, message):
-        self.logger.warning(message)
+    # def send_alert(self, message):
+    #     self.logger.warning(message)
 
     def generate_alert(self, threat, packet_info):
         alert = {
