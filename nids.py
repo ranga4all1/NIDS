@@ -7,7 +7,7 @@ from packet_capture import PacketCapture
 from traffic_analysis import TrafficAnalysis
 from detection_engine import DetectionEngine
 from alert_system import AlertSystem
-from scapy.all import IP, TCP
+from scapy.all import IP, TCP, get_if_list
 import queue
 
 
@@ -105,5 +105,26 @@ class IntrusionDetectionSystem:
 
 
 if __name__ == "__main__":
-    ids = IntrusionDetectionSystem()
+    # Detect available interfaces
+    interfaces = get_if_list()
+    print("Available interfaces:")
+    for i, iface in enumerate(interfaces):
+        print(f"{i+1}. {iface}")
+
+    # Ask user to select an interface
+    while True:
+        try:
+            choice = int(input(f"Select an interface (default is eth0, enter 0): "))
+            if choice == 0:
+                selected_interface = "eth0"
+                break
+            elif 1 <= choice <= len(interfaces):
+                selected_interface = interfaces[choice-1]
+                break
+            else:
+                print("Invalid choice. Please select a valid interface.")
+        except ValueError:
+            print("Invalid input. Please enter a number.")
+
+    ids = IntrusionDetectionSystem(interface=selected_interface)
     ids.start()
