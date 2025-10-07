@@ -15,10 +15,9 @@ pip install -r requirements.txt
 Note: Make sure to use python from your virtual environment
 '''
 ```
-conda activate nids
 sudo /opt/conda/envs/nids/bin/python nids.py
+# Select interface 'lo' (loopback), if you plan to use traffic generator for testing
 ```
-
 - In another terminal start traffic generator
 ```
 conda activate nids

@@ -53,6 +53,7 @@ The main script, [`nids.py`](nids.py), ties these components together, orchestra
     ```
     conda activate nids
     sudo /opt/conda/envs/nids/bin/python nids.py
+    # Select interface 'lo' (loopback), if you plan to use traffic generator for testing
     ```
 
     Note: Make sure to use the `python` executable from your virtual environment.

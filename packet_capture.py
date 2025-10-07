@@ -22,9 +22,12 @@ class PacketCapture:
     
     def start_capture(self, iface=None):
         def capture_thread():
-            sniff(iface=iface,
-            prn=self.packet_callback,
-            stop_filter=lambda x: self.stop_capture.is_set())
+            try:
+                sniff(iface=iface,
+                prn=self.packet_callback,
+                stop_filter=lambda x: self.stop_capture.is_set())
+            except Exception as e:
+                print(f"Error during packet capture: {e}")
 
         self.capture_thread = threading.Thread(target=capture_thread)
         self.capture_thread.start()
