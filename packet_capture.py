@@ -12,10 +12,17 @@ import time
 import logging
 
 class PacketCapture:
-    def __init__(self):
+    def __init__(self, filter_expression=None):
+        """
+        Initialize PacketCapture.
+        
+        Args:
+            filter_expression: BPF filter string (e.g., "host 127.0.0.1")
+        """
         self.packet_queue = queue.Queue()
-        self.stop_capture = threading.Event()        
-
+        self.stop_capture = threading.Event()
+        self.filter_expression = filter_expression
+        
     def packet_callback(self, packet):
         if IP in packet and TCP in packet:
             self.packet_queue.put(packet)
@@ -23,9 +30,12 @@ class PacketCapture:
     def start_capture(self, iface=None):
         def capture_thread():
             try:
-                sniff(iface=iface,
-                prn=self.packet_callback,
-                stop_filter=lambda x: self.stop_capture.is_set())
+                sniff(
+                    iface=iface,
+                    prn=self.packet_callback,
+                    filter=self.filter_expression,  # Apply BPF filter
+                    stop_filter=lambda x: self.stop_capture.is_set()
+                )
             except Exception as e:
                 print(f"Error during packet capture: {e}")
 
@@ -35,4 +45,3 @@ class PacketCapture:
     def stop(self):
         self.stop_capture.set()
         self.capture_thread.join()
-

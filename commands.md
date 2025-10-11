@@ -22,4 +22,15 @@ sudo /opt/conda/envs/nids/bin/python nids.py
 ```
 conda activate nids
 sudo /opt/conda/envs/nids/bin/python generate_suspicious_traffic.py
+
+# or
+sudo /opt/conda/envs/nids/bin/python simple_attack.py
+```
+
+## Demo
+```
+sudo /opt/conda/envs/nids/bin/python nids.py --interface lo --localhost-only
+
+# Option 1: Only show threat detections (hide normal packets)
+sudo /opt/conda/envs/nids/bin/python nids.py --interface lo --localhost-only 2>&1 | grep -E "(THREATS DETECTED|Training|Tracking|Port scan|SYN flood|🚨|⚠️|Signature|Anomaly)"
 ```

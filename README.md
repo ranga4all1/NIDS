@@ -54,6 +54,12 @@ The main script, [`nids.py`](nids.py), ties these components together, orchestra
     conda activate nids
     sudo /opt/conda/envs/nids/bin/python nids.py
     # Select interface 'lo' (loopback), if you plan to use traffic generator for testing
+
+    # Option 1:
+    sudo /opt/conda/envs/nids/bin/python nids.py --interface lo --localhost-only
+
+    # Option 2: Only show threat detections (hide normal packets)
+    sudo /opt/conda/envs/nids/bin/python nids.py --interface lo --localhost-only 2>&1 | grep -E "(THREATS DETECTED|Training|Tracking|Port scan|SYN flood|🚨|⚠️|Signature|Anomaly)"
     ```
 
     Note: Make sure to use the `python` executable from your virtual environment.
@@ -65,4 +71,7 @@ The main script, [`nids.py`](nids.py), ties these components together, orchestra
     ```
     conda activate nids
     sudo /opt/conda/envs/nids/bin/python generate_suspicious_traffic.py
+
+    # or
+    sudo /opt/conda/envs/nids/bin/python simple_attack.py
     ```

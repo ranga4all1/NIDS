@@ -6,9 +6,11 @@ import numpy as np
 import logging
 import json
 from pathlib import Path
+from collections import defaultdict
+import time
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)  # Changed to DEBUG
 logger = logging.getLogger(__name__)
 
 
@@ -34,9 +36,17 @@ class DetectionEngine:
             self.signature_rules = self.load_signature_rules()
             self.training_data = []
             self.is_trained = False
-            self.min_training_samples = max(10, min_training_samples)  # At least 10
+            self.min_training_samples = max(10, min_training_samples)
             self.max_training_samples = max_training_samples
             self.feature_names = ['packet_size', 'packet_rate', 'byte_rate']
+            
+            # Track connections for port scan detection
+            self.connection_tracker = defaultdict(lambda: {
+                'dest_ports': set(),
+                'last_update': time.time(),
+                'packet_count': 0
+            })
+            self.tracker_timeout = 60  # 60 seconds
             
             logger.info(f"Detection engine initialized with contamination={contamination}, "
                        f"min_samples={self.min_training_samples}")
@@ -55,34 +65,151 @@ class DetectionEngine:
             return {
                 'syn_flood': {
                     'description': 'SYN flood attack detection',
-                    'condition': lambda features: (
-                        str(features.get('tcp_flags', '')) == '2' and  # SYN flag 
-                        features.get('packet_size', float('inf')) < 100   
+                    'condition': lambda features, context: (
+                        str(features.get('tcp_flags', '')) == '2' and  # SYN flag only
+                        features.get('packet_size', float('inf')) < 100 and
+                        features.get('packet_rate', 0) > 100  # Higher threshold
                     )
                 },
                 'port_scan': {
                     'description': 'Port scanning detection',
-                    'condition': lambda features: (
-                        features.get('packet_size', float('inf')) < 100 and 
-                        features.get('packet_rate', 0) > 50  
+                    'condition': lambda features, context: (
+                        self._is_port_scan(context)
                     )
                 },
                 'large_packet': {
                     'description': 'Unusually large packet detection',
-                    'condition': lambda features: (
+                    'condition': lambda features, context: (
                         features.get('packet_size', 0) > 1400
                     )
                 },
                 'high_rate': {
                     'description': 'Abnormally high packet rate',
-                    'condition': lambda features: (
+                    'condition': lambda features, context: (
                         features.get('packet_rate', 0) > 1000
+                    )
+                },
+                'suspicious_flags': {
+                    'description': 'Suspicious TCP flag combinations',
+                    'condition': lambda features, context: (
+                        self._has_suspicious_flags(features.get('tcp_flags'))
                     )
                 }
             }
         except Exception as e:
             logger.error(f"Error loading signature rules: {e}")
             return {}
+    
+    def _is_port_scan(self, context):
+        """
+        Detect port scanning by tracking unique destination ports per source.
+        
+        Args:
+            context: Dictionary with source_ip and dest_port
+            
+        Returns:
+            bool: True if port scan detected
+        """
+        try:
+            if not context or 'source_ip' not in context or 'dest_port' not in context:
+                logger.debug("Missing context for port scan detection")
+                return False
+            
+            source_ip = context['source_ip']
+            dest_port = context['dest_port']
+            
+            logger.debug(f"Port scan check: {source_ip} -> port {dest_port}")
+            
+            # Skip if dest_port is ephemeral (likely legitimate)
+            if dest_port >= 32768:
+                logger.debug(f"Skipping ephemeral port {dest_port}")
+                return False
+            
+            # Update tracker
+            tracker = self.connection_tracker[source_ip]
+            tracker['dest_ports'].add(dest_port)
+            tracker['last_update'] = time.time()
+            tracker['packet_count'] += 1
+            
+            # Clean old entries
+            self._clean_tracker()
+            
+            # Detect scan: multiple different destination ports in short time
+            unique_ports = len(tracker['dest_ports'])
+            
+            # Debug logging - ALWAYS show when tracking suspicious ports
+            if dest_port < 1024 or dest_port in [3389, 8080]:
+                logger.info(f"📍 Tracking {source_ip}: {unique_ports} unique ports so far: {sorted(tracker['dest_ports'])}")
+            
+            # Port scan criteria - LOWERED THRESHOLD for demo
+            # - At least 3 different well-known/suspicious ports
+            well_known_ports = [p for p in tracker['dest_ports'] if p < 1024 or p in [3389, 8080]]
+            
+            if len(well_known_ports) >= 3:
+                logger.warning(f"🚨 Port scan detected from {source_ip}: {unique_ports} unique ports, "
+                           f"{len(well_known_ports)} suspicious ports: {sorted(well_known_ports)}")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error in port scan detection: {e}")
+            return False
+    
+    def _has_suspicious_flags(self, tcp_flags):
+        """
+        Check for suspicious TCP flag combinations.
+        
+        Args:
+            tcp_flags: TCP flags from packet
+            
+        Returns:
+            bool: True if suspicious flags detected
+        """
+        try:
+            if tcp_flags is None:
+                return False
+            
+            # Convert flags to integer if needed
+            if hasattr(tcp_flags, 'value'):
+                flag_value = int(tcp_flags.value)
+            else:
+                flag_value = int(tcp_flags)
+            
+            # Suspicious flag combinations:
+            # FIN only (0x01)
+            # URG only (0x20)
+            # FIN+URG (0x21)
+            # FIN+PSH (0x09)
+            # No flags (0x00) - null scan
+            
+            suspicious_combos = [0x00, 0x01, 0x20, 0x21, 0x09, 0x29, 0x03]
+            
+            if flag_value in suspicious_combos:
+                logger.info(f"Suspicious TCP flags detected: {flag_value:#x}")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error checking TCP flags: {e}")
+            return False
+    
+    def _clean_tracker(self):
+        """Clean up old entries from connection tracker."""
+        try:
+            current_time = time.time()
+            to_remove = []
+            
+            for source_ip, tracker in self.connection_tracker.items():
+                if current_time - tracker['last_update'] > self.tracker_timeout:
+                    to_remove.append(source_ip)
+            
+            for source_ip in to_remove:
+                del self.connection_tracker[source_ip]
+                
+        except Exception as e:
+            logger.error(f"Error cleaning tracker: {e}")
     
     def validate_features(self, features):
         """
@@ -254,12 +381,13 @@ class DetectionEngine:
             logger.error(f"Unexpected error during training: {e}", exc_info=True)
             return False
     
-    def detect_threats(self, features):
+    def detect_threats(self, features, packet_context=None):
         """
         Detect threats using signature and anomaly-based detection.
         
         Args:
             features: Dictionary of packet features
+            packet_context: Additional context (source_ip, dest_ip, dest_port, etc.)
             
         Returns:
             list: List of detected threats
@@ -272,6 +400,9 @@ class DetectionEngine:
                 logger.debug("Invalid features for threat detection")
                 return threats
             
+            # Prepare context
+            context = packet_context or {}
+            
             # Signature-based detection
             for rule_name, rule in self.signature_rules.items():
                 try:
@@ -279,14 +410,14 @@ class DetectionEngine:
                         logger.warning(f"Rule {rule_name} missing condition")
                         continue
                     
-                    if rule['condition'](features):
+                    if rule['condition'](features, context):
                         threats.append({
                             'type': 'signature',
                             'rule': rule_name,
                             'description': rule.get('description', 'No description'),
                             'confidence': 1.0
                         })
-                        logger.info(f"Signature match: {rule_name}")
+                        logger.info(f"🚨 Signature match: {rule_name}")
                         
                 except KeyError as e:
                     logger.error(f"Missing key in features for rule {rule_name}: {e}")
@@ -424,7 +555,8 @@ class DetectionEngine:
                 'min_training_samples': self.min_training_samples,
                 'max_training_samples': self.max_training_samples,
                 'signature_rules': len(self.signature_rules),
-                'anomaly_threshold': self.anomaly_threshold
+                'anomaly_threshold': self.anomaly_threshold,
+                'tracked_sources': len(self.connection_tracker)
             }
         except Exception as e:
             logger.error(f"Error getting stats: {e}")
@@ -437,6 +569,7 @@ class DetectionEngine:
         try:
             self.training_data.clear()
             self.is_trained = False
+            self.connection_tracker.clear()
             self.anomaly_detector = IsolationForest(
                 contamination=0.1,
                 random_state=42,
